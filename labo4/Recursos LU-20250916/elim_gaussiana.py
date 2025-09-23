@@ -211,7 +211,6 @@ def esSDP(A,atol=1e-10):
 
 
 #%%modulo alc
-
 def calculaLU(A):
         cant_op = 0
         m=A.shape[0]
@@ -245,11 +244,11 @@ def calculaLU(A):
         
         return L, U, cant_op
 
-def res_tri(L,b,inferior=True):
+def res_tri(A,b,inferior=True):
     if inferior:
-        return resolverLy(L, b)
+        return resolverLy(A, b)
     else:
-        return resolverUx(U, b)
+        return resolverUx(A, b)
     
 
 def inversa(A):
@@ -266,15 +265,17 @@ def inversa(A):
     return res.T
 
 A = np.array([
-    [2, 1, 3],
-    [0, 1, 4],
-    [5, 2, 1]
+    [2, 3, 1],
+    [2, 1, 0],
+    [0, 0, 1]
 ])
 
-Ainv = inversa(A)
+def calculaLDV(A):
+    L, U, count = calculaLU(A)
+    V,D, count2 = calculaLU(U.T)
+    
+    return L, D, V.T
 
-print(Ainv)
-print(A @ Ainv)
 #%%
 def main():
     n = 7
