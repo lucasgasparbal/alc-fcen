@@ -159,7 +159,7 @@ sol = resolverUx(U,y) #deberia ser 2,3,-1
 
 
 #%% 4
-
+#a
 def calculaLDV(A):
     L, U, count = elim_gaussiana(A)
     V,D, count2 = elim_gaussiana(U.T)
@@ -184,7 +184,97 @@ print(L)
 print(D)
 print(V)
 
+#b
+
+def esSimetrica(A, atol=1e-10):
+    res = True
+
+    for i in range(len(A)):
+        for j in range(len(A)):
+            if(not np.isclose(A[i][j], A[j][i],atol=atol)):
+                res = False
+
+    return res
+
+def esSDP(A,atol=1e-10):
+    if not esSimetrica(A,atol):
+        return False
     
+    L, D, V = calculaLDV(A)
+    res = True
+    for i in range(A.shape[0]):
+        if(not D[i,i] > 0):
+            res = False
+            
+    return res
+    pass
+
+
+#%%modulo alc
+
+def calculaLU(A):
+        cant_op = 0
+        m=A.shape[0]
+        n=A.shape[1]
+        Ac = A.copy().astype(np.float64)
+        
+        if m!=n:
+            print('Matriz no cuadrada')
+            return
+        
+        ## desde aqui -- CODIGO A COMPLETAR
+        L = np.zeros(A.shape)
+        U = np.zeros(A.shape)
+        
+        cant_op = 0
+        n = A.shape[0]
+        for i in range(n):
+            if np.isclose(Ac[i,i],0):
+                return None
+            for j in range(i+1,n):
+                multiplicador = Ac[j,i]/Ac[i,i] #1 division
+                filaMult = multiplicador*Ac[i,i:]
+                Ac[j,i:] = Ac[j,i:] - filaMult # n-i restas y n-i multiplicaciones
+                Ac[j,i] = multiplicador
+                cant_op += 1+2*(n-i)
+                
+            L[i,i] = 1
+            L[i+1:,i] = Ac[i+1:,i]
+            U[i,i:] = Ac[i,i:]
+                
+        
+        return L, U, cant_op
+
+def res_tri(L,b,inferior=True):
+    if inferior:
+        return resolverLy(L, b)
+    else:
+        return resolverUx(U, b)
+    
+
+def inversa(A):
+    L, U, c = calculaLU(A)
+    n = A.shape[0]
+    res = np.zeros(A.shape)
+    for i  in range(n):
+        ei = np.zeros(n)
+        ei[i] = 1
+        y = res_tri(L,ei)
+        x = res_tri(U,y,False)
+        res[i] = x
+    
+    return res.T
+
+A = np.array([
+    [2, 1, 3],
+    [0, 1, 4],
+    [5, 2, 1]
+])
+
+Ainv = inversa(A)
+
+print(Ainv)
+print(A @ Ainv)
 #%%
 def main():
     n = 7
