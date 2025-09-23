@@ -162,9 +162,9 @@ sol = resolverUx(U,y) #deberia ser 2,3,-1
 
 def calculaLDV(A):
     L, U, count = elim_gaussiana(A)
-    V, D, count2 = elim_gaussiana(U.T)
+    V,D, count2 = elim_gaussiana(U.T)
     
-    return L, D, V
+    return L, D, V.T
 
 A = np.array([
     [2, 1, -1],
@@ -176,7 +176,7 @@ L, U, count =elim_gaussiana(A)
 
 print(L)
 print(U)
-
+print(U.T)
 print("---LDV---")
 L, D, V = calculaLDV(A)
 
