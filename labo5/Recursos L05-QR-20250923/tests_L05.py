@@ -1,5 +1,8 @@
 import alc
 
+import numpy as np
+
+import matplotlib.pyplot as plt
 ### Funciones L05-QR
 def QR_con_GS(A,tol=1e-12,retorna_nops=False):
     """
@@ -56,7 +59,91 @@ def QR_con_GS(A,tol=1e-12,retorna_nops=False):
     else:
             return Q, R
         
+#%% 1b
+def inversaQR(A):
+    Q, R = QR_con_GS(A)
+    if Q is None:
+        return None
+    n = A.shape[0]
+    res = np.zeros(A.shape)
+    for i  in range(n):
+        ei = np.zeros(n)
+        ei[i] = 1
+        y = np.linalg.solve(Q,ei)
+        x = alc.res_tri(R,y,False)
+        res[i] = x
+    
+    return res.T
+def A_aleatoria(n):
+    res = np.zeros([n,n])
+    
+    for i in range(n):
+        for j in range(n):
+            res[i,j] = np.float64(-1 + 2*np.random.random())
+    
+    return res
+A = A_aleatoria(5)
+L, U , nopsLU = alc.calculaLU(A)
+while L is None:
+    A = A_aleatoria(5)
+    L, U , nopsLU = alc.calculaLU(A)
+    
+Q, R, nopsQR = QR_con_GS(A,retorna_nops=True)
+
+AinvLU = alc.inversa(A)
+AinvQR = inversaQR(A)
+print("---linalg---")
+print(np.linalg.inv(A))
+print("---QR---")
+print(AinvQR)
+print("---LU---")
+print(AinvLU)
+ELU = A @ AinvLU
+EQR = A @ AinvQR
+In = np.eye(5,5)
+print("cant LU: "+ str(nopsLU))
+print("cant QR: "+ str(nopsQR))
+normaLU = alc.normaExacta(ELU-In, 'inf')
+normaQR = alc.normaExacta(EQR-In, 'inf')
+print("---EQR---")
+print(EQR)
+print("---ELU---")
+print(ELU)
+print(normaLU)
+print(normaQR)
+
+ns = [2,5,10,20,50,100]
+
+for n in ns:
+    erroresLU = []
+    erroresQR = []
+    for i in range(100):
+        A = A_aleatoria(n)
+        L, U , nopsLU = alc.calculaLU(A)
+        while L is None:
+            A = A_aleatoria(n)
+            L, U , nopsLU = alc.calculaLU(A)
             
+        Q, R, nopsQR = QR_con_GS(A,retorna_nops=True)
+        AinvLU = alc.inversa(A)
+        AinvQR = inversaQR(A)
+        ELU = A @ AinvLU
+        EQR = A @ AinvQR
+        In = np.eye(n,n)
+        normaLU = alc.normaExacta(ELU-In, 'inf')
+        normaQR = alc.normaExacta(EQR-In, 'inf')
+        erroresLU.append(normaLU)
+        erroresQR.append(normaQR)
+    fig, ax = plt.subplots()
+    
+    ax.set_title("Error al calcular inversa con n = " +str(n))
+    
+    ax.hist(erroresLU,alpha=0.5,label="con LU")
+    ax.hist(erroresQR,alpha=0.5,label="con QR")
+    ax.legend()
+    plt.show()
+
+#%%            
 #Para las matrices H recordar H = I-2uu^t            
 
 def QR_con_HH(A,tol=1e-12):
@@ -69,7 +156,7 @@ def QR_con_HH(A,tol=1e-12):
 def calculaQR(A,metodo='RH',tol=1e-12):
     """
     A una matriz de n x n 
-    tol la tolerancia con la que se filtran elementos nulos en R    
+    tol la tolerancia con la que se filtran elementos nulos en R    ELU
     metodo = ['RH','GS'] usa reflectores de Householder (RH) o Gram Schmidt (GS) para realizar la factorizacion
     retorna matrices Q y R calculadas con Gram Schmidt (y como tercer argumento opcional, el numero de operaciones)
     Si el metodo no esta entre las opciones, retorna None
@@ -77,7 +164,6 @@ def calculaQR(A,metodo='RH',tol=1e-12):
 
 # Tests L05-QR:
 
-import numpy as np
 
 # --- Matrices de prueba ---
 A2 = np.array([[1., 2.],
