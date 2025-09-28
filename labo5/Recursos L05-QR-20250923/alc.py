@@ -1,18 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Sep 23 11:19:13 2025
-
-@author: Estudiante
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Sep 20 19:54:44 2025
-
-@author: lucas
-"""
 import numpy as np
 
 
@@ -209,4 +194,202 @@ def esSDP(A,atol=1e-10):
     return res
     pass
 
+def productoEscalar(x,y,atol=1e-12):
+    
+    if x.shape != y.shape:
+        return None
+    
+    n  = x.shape[0]
+    
+    suma = np.float64(0)
+    for i in range(n):
+        termino = x[i]*y[i]
+        if abs(termino) >= atol:
+            suma += x[i]*y[i]
+        
+        
+        
+    return suma
+    
+def productoMatricial(A,B,atol=1e-12):
+    n,m = A.shape
+    q,r = B.shape
+    if m != q:
+        return None
+    
+    res = np.zeros((n,r))
+    
+    for i in range(n):
+        for j in range(r):
+            res[i,j] = productoEscalar(A[i], B[:,j],atol)
+            if abs(res[i,j]) < atol:
+                res[i,j] = 0
+    
+    return res
 
+def QR_con_GS(A,tol=1e-12,retorna_nops=False):
+    nops = 0
+    if A.shape[0] != A.shape[1]:
+        return None, None
+        if retorna_nops:
+            return None, None, nops
+        
+    Q = np.zeros(A.shape)
+    R = np.zeros(A.shape)
+    n = A.shape[0]
+    norma2 = norma(A[:,0],2) # n sumas + n productos y 1 raiz cuadrada
+    
+    nops += 2*n+1
+    
+    Q[:,0] = A[:,0]/norma2 # n divisiones
+    R[0,0] = norma2
+    
+    nops += n
+    
+    for i in range(1,n):
+        Q[:,i] = A[:,i]
+        
+        for j in range(i):
+            
+            R[j,i] = productoEscalar(Q[:,j].T,Q[:,i]) # n productos y n sumas
+            if sonIguales(R[j,i], 0,tol):
+                R[j,i] = 0
+                
+            nops += 2*n
+            
+            Q[:,i] = Q[:,i] -(R[j,i]*Q[:,j]) # n productos y n restas
+            
+            nops += 2*n
+        
+        R[i,i] = norma(Q[:,i],2) # n sumas + n productos y 1 raiz cuadrada
+        
+        nops += 2*n+1
+        
+        
+        Q[:,i] = Q[:,i]/R[i,i] #n divisiones
+    
+        nops += n
+    
+    if retorna_nops:
+            return Q, R, nops
+    else:
+            return Q, R
+
+def uuT(u):
+    n = u.shape[0]
+    res = np.zeros((n,n))
+    
+    for i in range(n):
+        for j in range(n):
+            res[i,j] = u[i]*u[j]
+            
+    return res
+
+
+def QR_con_HH(A,tol=1e-12):
+    m, n = A.shape
+    if m < n:
+        return None, None
+    
+    R = A.copy()
+    Q = np.eye(m)
+    
+    for k in range(n-1):
+        x = R[k:,k]
+        alfa = np.sign(x[0])*norma(x,2)
+        u = x -alfa*np.eye(x.shape[0])[0]
+        normaU = norma(u,2)
+        if normaU > tol:
+            u = u / normaU
+            
+            Hk = np.eye(m-k)-2*uuT(u) # dimension de Hk m-k x m-k
+            
+            '''
+            Haciendo producto por bloques entre Hkmonio = [[Ik, 0],  y R =[[R1, R2],
+                                                           [0, Hk]]        [0, R4]]
+            
+            Hkmonio @ R = [[R1, R2],
+                           [0,Hk*R4]]
+            '''
+            if k == 0:
+                R = productoMatricial(Hk, R,tol)
+            else:
+                R[k:,k:] = productoMatricial(Hk, R[k:,k:],tol) #R4
+            
+            '''
+            Haciendo producto por bloques entre Hkmonio.T = [[Ik, 0],  y Q =[[Q1, Q2],
+                                                           [0, Hk.T]]        [Q3, Q4]]
+            
+            Q @ Hkmonio.T = [[Q1, Q2@Hk.T],
+                             [Q3,Q4@Hk.T]
+            '''
+            if k == 0:
+                Q = productoMatricial(Q, Hk.T,tol)
+            else:
+                Q[:k,k:] = productoMatricial(Q[:k,k:], Hk.T,tol) #Q2
+                Q[k:,k:] = productoMatricial(Q[k:,k:], Hk.T,tol) #Q4
+    
+    return Q, R
+
+def calculaQR(A,metodo='RH',tol=1e-12):
+    if metodo == 'RH':
+        return QR_con_HH(A,tol)
+    elif metodo == 'GS':
+        return QR_con_GS(A,tol)
+    else:
+        return None, None
+    
+
+#%% Tests L05-QR:
+
+
+# --- Matrices de prueba ---
+A2 = np.array([[1., 2.],
+               [3., 4.]])
+
+A3 = np.array([[1., 0., 1.],
+               [0., 1., 1.],
+               [1., 1., 0.]])
+
+A4 = np.array([[2., 0., 1., 3.],
+               [0., 1., 4., 1.],
+               [1., 0., 2., 0.],
+               [3., 1., 0., 2.]])
+
+# --- Funciones auxiliares para los tests ---
+def check_QR(Q,R,A,tol=1e-10):
+    # Comprueba ortogonalidad y reconstrucción
+    assert np.allclose(Q.T @ Q, np.eye(Q.shape[1]), atol=tol)
+    assert np.allclose(Q @ R, A, atol=tol)
+
+# --- TESTS PARA QR_by_GS2 ---
+Q2,R2 = QR_con_GS(A2)
+check_QR(Q2,R2,A2)
+
+Q3,R3 = QR_con_GS(A3)
+check_QR(Q3,R3,A3)
+
+Q4,R4 = QR_con_GS(A4)
+check_QR(Q4,R4,A4)
+
+# --- TESTS PARA QR_by_HH ---
+Q2h,R2h = QR_con_HH(A2)
+check_QR(Q2h,R2h,A2)
+
+Q3h,R3h = QR_con_HH(A3)
+check_QR(Q3h,R3h,A3)
+
+Q4h,R4h = QR_con_HH(A4)
+check_QR(Q4h,R4h,A4)
+
+# --- TESTS PARA calculaQR ---
+Q2c,R2c = calculaQR(A2,metodo='RH')
+check_QR(Q2c,R2c,A2)
+
+Q3c,R3c = calculaQR(A3,metodo='GS')
+check_QR(Q3c,R3c,A3)
+
+Q4c,R4c = calculaQR(A4,metodo='RH')
+check_QR(Q4c,R4c,A4)
+
+print("Labo5 OK!")
