@@ -209,13 +209,37 @@ def productoEscalar(x,y,atol=1e-12):
         if abs(termino) >= atol:
             suma += x[i]*y[i]
         
-        
+    if abs(suma) < atol:
+        suma = 0    
         
     return suma
+
+def Ax(A,x,atol=1e-12):
+    n , m = A.shape
+    if m != x.size:
+        return None
     
+    b = np.zeros(n)
+
+    for i in range(n):
+        b[i] = productoEscalar(A[i],x,atol)
+
+    return b
+
+    
+    
+
+
+
 def productoMatricial(A,B,atol=1e-12):
+
+    if len(B.shape) == 2:
+        q, r = B.shape
+    else:
+       return Ax(A,B,atol)
     n,m = A.shape
-    q,r = B.shape
+    
+
     if m != q:
         return None
     
@@ -224,8 +248,6 @@ def productoMatricial(A,B,atol=1e-12):
     for i in range(n):
         for j in range(r):
             res[i,j] = productoEscalar(A[i], B[:,j],atol)
-            if abs(res[i,j]) < atol:
-                res[i,j] = 0
     
     return res
 
