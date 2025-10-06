@@ -2,7 +2,7 @@
 
 import numpy as np
 
-
+#labo1
 def error(a,b):
     x = np.float64(a)
     y = np.float64(b)
@@ -14,6 +14,8 @@ def error(a,b):
 
 def sonIguales(a, b, atol=1e-10):
     return error(a,b) < atol
+
+#labo2
 
 def norma(x,p):
     if p == 'inf':
@@ -65,6 +67,7 @@ def normaExacta(A,p):
                 maximo = suma
         return maximo
     
+#labo3
     
 def condMC(A,p,Np):
     inversa = np.linalg.inv(A)
@@ -77,6 +80,8 @@ def condExacta(A,p):
     normaA = normaExacta(A, p)
     normaInversa = normaExacta(inversa, p)
     return normaA * normaInversa
+
+#labo4
 
 def calculaLU(A):
         cant_op = 0
@@ -196,6 +201,9 @@ def esSDP(A,atol=1e-10):
     return res
     pass
 
+
+#labo 5
+
 def productoEscalar(x,y,atol=1e-12):
     
     if x.shape != y.shape:
@@ -227,12 +235,24 @@ def Ax(A,x,atol=1e-12):
     return b
 
     
+def vTA(v,A,atol=1e-12):
+    n = v.size
+    if n != A.shape[0]:
+        return None
     
+    res = np.zeros(A.shape[1])
+    for i in range(A.shape[1]):
+        res[i] = productoEscalar(v,A[:,i],atol)
+    
+    return res
+        
 
 
 
 def productoMatricial(A,B,atol=1e-12):
-
+    if len(A.shape) == 1:
+        #asumo que es un vector fila
+        return vTA(A,B)
     if len(B.shape) == 2:
         q, r = B.shape
     else:
@@ -300,14 +320,22 @@ def QR_con_GS(A,tol=1e-12,retorna_nops=False):
             return Q, R
 
 def uuT(u):
-    n = u.shape[0]
+    return vwT(u,u)
+
+def vwT(v,w):
+    n = v.shape[0]
+
+    if n != w.shape[0]:
+        return None
+
     res = np.zeros((n,n))
     
     for i in range(n):
         for j in range(n):
-            res[i,j] = u[i]*u[j]
+            res[i,j] = v[i]*w[j]
             
     return res
+
 
 
 def QR_con_HH(A,tol=1e-12):
@@ -362,7 +390,65 @@ def calculaQR(A,metodo='RH',tol=1e-12):
         return QR_con_GS(A,tol)
     else:
         return None, None
+
+#labo 6
+
+def calcularFk(A,k,v,atol=1e-12):
+
+    w = productoMatricial(A,v,atol)
+    normaW = norma(w,2)
+    if normaW > 0:
+        w = w / normaW
     
+    for i in range(k-1):
+        w = productoMatricial(A,w,atol)
+        normaW = norma(w,2)
+        if normaW > 0:
+            w = w / normaW
+
+    return w
+
+def metpot2k(A,tol=1e-15,K = 1000):
+
+    n = A.shape[0]
+    v = np.random.randn(n)
+    vmonio = calcularFk(A,2,v)
+    e = productoEscalar(vmonio,v,tol)
+    eAnt = 0
+    k = 0
+    while abs(e-1) > tol and k < K:
+        v = vmonio
+        vmonio = calcularFk(A,2,v)
+        e = productoEscalar(vmonio,v,tol)    
+        k += 1
+    
+    autovalor = productoEscalar(vmonio,productoMatricial(A,vmonio,tol),tol)
+
+    return v, autovalor, k, abs(e-1)
+
+def diagRH(A,tol=1e-15,K=1e5):
+    v1, l1,_,_ = metpot2k(A,tol,K)
+    n = A.shape[0]
+    u = np.eye(n)[0]-v1
+    u = u/norma(u,2)
+    if n == 2:
+        S = np.eye(n)-2*uuT(u)
+        D = A-2*vwT(u,productoMatricial(u,A))
+        D = D-2*vwT(productoMatricial(D,u),u)
+    else:
+        B = A-2*vwT(u,productoMatricial(u,A))
+        B= B-2*vwT(productoMatricial(B,u),u)
+        Amonio = B[1:n,1:n]
+        Smonio, Dmonio = diagRH(Amonio,tol,K)
+        D = np.zeros((n,n))
+        D[0,0] = l1
+        D[1:n,1:n] = Dmonio
+        S = np.zeros((n,n))
+        S[0,0] = 1
+        S[1:n,1:n] = Smonio
+        S = S-2*vwT(u,productoMatricial(u,S))
+
+    return S, D
 
 #%% Tests L05-QR:
 
@@ -417,4 +503,75 @@ Q4c,R4c = calculaQR(A4,metodo='RH')
 check_QR(Q4c,R4c,A4)
 
 print("Labo5 OK!")
-# %%
+# Test L06-metpot2k, Aval
+
+import numpy as np
+
+#### TESTEOS
+# Tests metpot2k
+
+S = np.vstack([
+    np.array([2,1,0])/np.sqrt(5),
+    np.array([-1,2,5])/np.sqrt(30),
+    np.array([1,-2,1])/np.sqrt(6)
+              ]).T
+
+# Pedimos que pase el 95% de los casos
+exitos = 0
+for i in range(100):
+    D = np.diag(np.random.random(3)+1)*100
+    A = S@D@S.T
+    v,l,_,_ = metpot2k(A,1e-15,1e5)
+    if np.abs(l - np.max(D))< 1e-8:
+        exitos += 1
+assert exitos > 95
+
+
+#Test con HH
+exitos = 0
+for i in range(100):
+    v = np.random.rand(9)
+    #v = np.abs(v)
+    #v = (-1) * v
+    ixv = np.argsort(-np.abs(v))
+    D = np.diag(v[ixv])
+    I = np.eye(9)
+    H = I - 2*np.outer(v.T, v)/(np.linalg.norm(v)**2)   #matriz de HouseHolder
+
+    A = H@D@H.T
+    v,l,_,_ = metpot2k(A, 1e-15, 1e5)
+    #max_eigen = abs(D[0][0])
+    if abs(l - D[0,0]) < 1e-8:         
+        exitos +=1
+assert exitos > 95
+
+
+
+# Tests diagRH
+D = np.diag([1,0.5,0.25])
+S = np.vstack([
+    np.array([1,-1,1])/np.sqrt(3),
+    np.array([1,1,0])/np.sqrt(2),
+    np.array([1,-1,-2])/np.sqrt(6)
+              ]).T
+
+A = S@D@S.T
+SRH,DRH = diagRH(A,tol=1e-15,K=1e5)
+assert np.allclose(D,DRH)
+assert np.allclose(np.abs(S.T@SRH),np.eye(A.shape[0]),atol=1e-7)
+
+
+
+# Pedimos que pase el 95% de los casos
+exitos = 0
+for i in range(100):
+    A = np.random.random((5,5))
+    A = 0.5*(A+A.T)
+    S,D = diagRH(A,tol=1e-15,K=1e5)
+    ARH = S@D@S.T
+    e = normaExacta(ARH-A,p='inf')
+    if e < 1e-5: 
+        exitos += 1
+assert exitos >= 95
+
+print("LABO 6 OK!")
