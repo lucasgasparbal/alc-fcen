@@ -319,10 +319,10 @@ def QR_con_GS(A,tol=1e-12,retorna_nops=False):
     else:
             return Q, R
 
-def uuT(u):
-    return vwT(u,u)
+def uuT(u,tol=1e-12):
+    return vwT(u,u,tol)
 
-def vwT(v,w):
+def vwT(v,w,tol=1e-12):
     n = v.shape[0]
 
     if n != w.shape[0]:
@@ -333,10 +333,17 @@ def vwT(v,w):
     for i in range(n):
         for j in range(n):
             res[i,j] = v[i]*w[j]
+            if abs(res[i,j]) < tol:
+                res[i,j] = 0
             
     return res
 
-
+def check_tol(A,tol=1e-12):
+    n, m = A.shape
+    for i in range(n):
+        for j in range(m):
+            if abs(A[i,j]) < tol:
+                A[i,j] = 0
 
 def QR_con_HH(A,tol=1e-12):
     m, n = A.shape
@@ -354,7 +361,6 @@ def QR_con_HH(A,tol=1e-12):
         if normaU > tol:
             u = u / normaU
             
-            Hk = np.eye(m-k)-2*uuT(u) # dimension de Hk m-k x m-k
             
             '''
             Haciendo producto por bloques entre Hkmonio = [[Ik, 0],  y R =[[R1, R2],
@@ -364,9 +370,12 @@ def QR_con_HH(A,tol=1e-12):
                            [0,Hk*R4]]
             '''
             if k == 0:
-                R = productoMatricial(Hk, R,tol)
+                R = R -2*vwT(u,productoMatricial(u,R,tol),tol) #productoMatricial(Hk, R,tol)
+                check_tol(R,tol)
             else:
-                R[k:,k:] = productoMatricial(Hk, R[k:,k:],tol) #R4
+                R4 = R[k:,k:]
+                R4= R4 -2*vwT(u,productoMatricial(u,R4,tol),tol) #productoMatricial(Hk, R[k:,k:],tol) #R4
+                check_tol(R4,tol)
             
             '''
             Haciendo producto por bloques entre Hkmonio.T = [[Ik, 0],  y Q =[[Q1, Q2],
@@ -375,11 +384,21 @@ def QR_con_HH(A,tol=1e-12):
             Q @ Hkmonio.T = [[Q1, Q2@Hk.T],
                              [Q3,Q4@Hk.T]
             '''
+            
+            
             if k == 0:
-                Q = productoMatricial(Q, Hk.T,tol)
+                Q = Q - 2*vwT(productoMatricial(Q,u,tol),u,tol) #productoMatricial(Q, Hk.T,tol)
+                check_tol(Q,tol)
             else:
-                Q[:k,k:] = productoMatricial(Q[:k,k:], Hk.T,tol) #Q2
-                Q[k:,k:] = productoMatricial(Q[k:,k:], Hk.T,tol) #Q4
+                Q2 = Q[:k,k:]
+                Q4 = Q[k:,k:]
+                if k == 1:
+                    Q2 = Q2 -2*productoEscalar(Q2[0],u,tol)*u.T # si k1 Q2 es un vector fila y Q2*u es escalar
+                else:
+                    Q2 = Q2 -2*vwT(productoMatricial(Q2,u,tol),u,tol) #productoMatricial(Q[:k,k:], Hk.T,tol) #Q2
+                Q4 =  Q4 -2*vwT(productoMatricial(Q4,u,tol),u,tol) #productoMatricial(Q[k:,k:], Hk.T,tol) #Q4
+                check_tol(Q2,tol)
+                check_tol(Q4,tol)
     
     return Q, R
 
@@ -414,7 +433,6 @@ def metpot2k(A,tol=1e-15,K = 1000):
     v = np.random.randn(n)
     vmonio = calcularFk(A,2,v)
     e = productoEscalar(vmonio,v,tol)
-    eAnt = 0
     k = 0
     while abs(e-1) > tol and k < K:
         v = vmonio
@@ -435,9 +453,11 @@ def diagRH(A,tol=1e-15,K=1e5):
         S = np.eye(n)-2*uuT(u)
         D = A-2*vwT(u,productoMatricial(u,A))
         D = D-2*vwT(productoMatricial(D,u),u)
+        check_tol(D)
     else:
         B = A-2*vwT(u,productoMatricial(u,A))
         B= B-2*vwT(productoMatricial(B,u),u)
+        check_tol(B)
         Amonio = B[1:n,1:n]
         Smonio, Dmonio = diagRH(Amonio,tol,K)
         D = np.zeros((n,n))
@@ -575,3 +595,5 @@ for i in range(100):
 assert exitos >= 95
 
 print("LABO 6 OK!")
+
+# %%
