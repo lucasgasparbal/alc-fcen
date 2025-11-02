@@ -1,7 +1,4 @@
-#%%
-
 import numpy as np
-
 #labo1
 def error(a,b):
     x = np.float64(a)
@@ -127,6 +124,7 @@ def condExacta(A,p):
     normaInversa = normaExacta(inversa, p)
     return normaA * normaInversa
 
+ 
 #labo4
 
 def calculaLU(A):
@@ -240,8 +238,7 @@ def esSDP(A,atol=1e-10):
             
     return res
 
-
-#labo 5
+#LABO 5
 
 def productoEscalar(x,y,atol=1e-12):
     
@@ -256,10 +253,20 @@ def productoEscalar(x,y,atol=1e-12):
         if abs(termino) >= atol:
             suma += x[i]*y[i]
         
-    if abs(suma) < atol:
-        suma = 0    
+        
         
     return suma
+
+def vTA(v,A,atol=1e-12):
+    n = v.size
+    if n != A.shape[0]:
+        return None
+    
+    res = np.zeros(A.shape[1])
+    for i in range(A.shape[1]):
+        res[i] = productoEscalar(v,A[:,i],atol)
+    
+    return res
 
 def Ax(A,x,atol=1e-12):
     n , m = A.shape
@@ -273,25 +280,17 @@ def Ax(A,x,atol=1e-12):
 
     return b
 
+def check_tol(A,tol=1e-12):
+    n, m = A.shape
+    for i in range(n):
+        for j in range(m):
+            if abs(A[i,j]) < tol:
+                A[i,j] = 0
     
-def vTA(v,A,atol=1e-12):
-    n = v.size
-    if n != A.shape[0]:
-        return None
-    
-    res = np.zeros(A.shape[1])
-    for i in range(A.shape[1]):
-        res[i] = productoEscalar(v,A[:,i],atol)
-    
-    return res
-        
-
-
-
 def productoMatricial(A,B,atol=1e-12):
     if len(A.shape) == 1:
         #asumo que es un vector fila
-        return vTA(A,B)
+        return vTA(A,B,atol)
     if len(B.shape) == 2:
         q, r = B.shape
     else:
@@ -377,12 +376,6 @@ def vwT(v,w,tol=1e-12):
             
     return res
 
-def check_tol(A,tol=1e-12):
-    n, m = A.shape
-    for i in range(n):
-        for j in range(m):
-            if abs(A[i,j]) < tol:
-                A[i,j] = 0
 
 def QR_con_HH(A,tol=1e-12):
     m, n = A.shape
@@ -449,53 +442,65 @@ def calculaQR(A,metodo='RH',tol=1e-12):
     else:
         return None, None
 
-#labo 6
+#LABO 6
 
-def calcularFk(A,k,v,atol=1e-12):
-
-    w = productoMatricial(A,v,atol)
-    normaW = norma(w,2)
-    if normaW > 0:
-        w = w / normaW
+def prod_interno(p,q):
+    sumador = 0
+    for i in range(len(p)):
+        sumador += p[i]*q[i]
+    return sumador #esta al cuadrado
     
-    for i in range(k-1):
-        w = productoMatricial(A,w,atol)
-        normaW = norma(w,2)
-        if normaW > 0:
-            w = w / normaW
+def f_A(A,v):
+    w_prima = multMatrizXColumna(A,v)
+    norma_w_prima2 =prod_interno(w_prima,w_prima) #||w_prima||^2
+    norma_w_prima = np.sqrt(norma_w_prima2)
+    res = np.zeros_like(v)
+    if norma_w_prima != 0:
+        res = w_prima / norma_w_prima
+    return res
 
-    return w
+def multMatrizXColumna(A,c):
+    n,m= A.shape
+    res = np.zeros(n)
+    for i in range(n):
+        for j in range(m):
+            res[i]+= A[i][j]*c[j]
+    return res
 
-def metpot2k(A,tol=1e-15,K = 1000):
-
-    n = A.shape[0]
+def metpot(A,tol=1e-15,K=1000):
+    n,n = A.shape
     v = np.random.randn(n)
-    vmonio = calcularFk(A,2,v)
-    e = productoEscalar(vmonio,v,tol)
+    v_moño1 = f_A(A,v)
+    v_moño = f_A(A,v_moño1)
+    e = prod_interno(v_moño,v)
     k = 0
-    while abs(e-1) > tol and k < K:
-        v = vmonio
-        vmonio = calcularFk(A,2,v)
-        e = productoEscalar(vmonio,v,tol)    
-        k += 1
-    
-    autovalor = productoEscalar(vmonio,productoMatricial(A,vmonio,tol),tol)
+    cont_iteraciones = 0
+    while(abs(e-1) >tol and k < K):
+        v = v_moño
+        v_moño1 = f_A(A,v)
+        v_moño= f_A(A,v_moño1)
+        e = prod_interno(v_moño,v)
+        cont_iteraciones +=1
+        k+=1
+    lambdaADevolver = prod_interno(v_moño,multMatrizXColumna(A,v_moño))
+    return [v,lambdaADevolver,cont_iteraciones]
 
-    return v, autovalor, k, abs(e-1)
 
 def diagRH(A,tol=1e-15,K=1e5):
-    v1, l1,_,_ = metpot2k(A,tol,K)
+    v1, l1,_ = metpot(A,tol,K)
     n = A.shape[0]
     u = np.eye(n)[0]-v1
     u = u/norma(u,2)
     if n == 2:
-        S = np.eye(n)-2*uuT(u)
-        D = A-2*vwT(u,productoMatricial(u,A))
-        D = D-2*vwT(productoMatricial(D,u),u)
+        S = np.eye(n)-2*uuT(u,tol)
+        check_tol(S)
+        D = A-2*vwT(u,productoMatricial(u,A,tol),tol)
+        D = D-2*vwT(productoMatricial(D,u,tol),u,tol)
         check_tol(D)
     else:
-        B = A-2*vwT(u,productoMatricial(u,A))
-        B= B-2*vwT(productoMatricial(B,u),u)
+        B = A-2*vwT(u,productoMatricial(u,A,tol),tol)
+        check_tol(B)
+        B= B-2*vwT(productoMatricial(B,u,tol),u,tol)
         check_tol(B)
         Amonio = B[1:n,1:n]
         Smonio, Dmonio = diagRH(Amonio,tol,K)
@@ -505,245 +510,120 @@ def diagRH(A,tol=1e-15,K=1e5):
         S = np.zeros((n,n))
         S[0,0] = 1
         S[1:n,1:n] = Smonio
-        S = S-2*vwT(u,productoMatricial(u,S))
+        S = S-2*vwT(u,productoMatricial(u,S,tol),tol)
+        check_tol(S)
 
     return S, D
 
-# Tests L04-LU
-import numpy as np
-from alc import *
-# Tests LU
-
-L0 = np.array([[1,0,0],[0,1,0],[1,1,1]])
-U0 = np.array([[10,1,0],[0,2,1],[0,0,1]])
-A =  L0 @ U0
-L,U,nops = calculaLU(A)
-assert(np.allclose(L,L0))
-assert(np.allclose(U,U0))
-
-
-L0 = np.array([[1,0,0],[1,1.001,0],[1,1,1]])
-U0 = np.array([[1,1,1],[0,1,1],[0,0,1]])
-A =  L0 @ U0
-L,U,nops = calculaLU(A)
-assert(not np.allclose(L,L0))
-assert(not np.allclose(U,U0))
-assert(np.allclose(L,L0,atol=1e-3))
-assert(np.allclose(U,U0,atol=1e-3))
-assert(nops == 13)
-
-L0 = np.array([[1,0,0],[1,1,0],[1,1,1]])
-U0 = np.array([[1,1,1],[0,0,1],[0,0,1]])
-A =  L0 @ U0
-L,U,nops = calculaLU(A)
-assert(L is None)
-assert(U is None)
-assert(nops == 0)
-
-## Tests res_tri
-
-A = np.array([[1,0,0],[1,1,0],[1,1,1]])
-b = np.array([1,1,1])
-assert(np.allclose(res_tri(A,b),np.array([1,0,0])))
-b = np.array([0,1,0])
-assert(np.allclose(res_tri(A,b),np.array([0,1,-1])))
-b = np.array([-1,1,-1])
-assert(np.allclose(res_tri(A,b),np.array([-1,2,-2])))
-b = np.array([-1,1,-1])
-assert(np.allclose(res_tri(A,b,inferior=False),np.array([-1,1,-1])))
-
-A = np.array([[3,2,1],[0,2,1],[0,0,1]])
-b = np.array([3,2,1])
-assert(np.allclose(res_tri(A,b,inferior=False),np.array([1/3,1/2,1])))
-
-A = np.array([[1,-1,1],[0,1,-1],[0,0,1]])
-b = np.array([1,0,1])
-assert(np.allclose(res_tri(A,b,inferior=False),np.array([1,1,1])))
-
-# Test inversa
-
-ntest = 10
-iter = 0
-while iter < ntest:
-    A = np.random.random((4,4))
-    A_ = inversa(A)
-    if not A_ is None:
-        assert(np.allclose(np.linalg.inv(A),A_))
-        iter += 1
-
-# Matriz singular devería devolver None
-A = np.array([[1,2,3],[4,5,6],[7,8,9]])
-assert(inversa(A) is None)
+def transiciones_al_azar_continuas(n):
+    """
+    n la cantidad de filas (columnas) de la matriz de transición.
+    Retorna matriz T de n x n normalizada por columnas, y con entradas al azar en el intervalo [0,1]
+    """
+    A = np.random.rand(n,n)
+    listaNormalizados = normaliza(A.T,1)
+    res = np.array(listaNormalizados)
+    return res.T
 
 
 
+def transiciones_al_azar_uniformes(n,thres):
+    """
+    n la cantidad de filas (columnas) de la matriz de transición.
+    thres probabilidad de que una entrada sea distinta de cero.
+    Retorna matriz T de n x n normalizada por columnas. 
+    El elemento i,j es distinto de cero si el número generado al azar para i,j es menor o igual a thres. 
+    Todos los elementos de la columna $j$ son iguales 
+    (a 1 sobre el número de elementos distintos de cero en la columna).
+    """
+    
+    A = np.random.rand(n,n)
+    for i in range(n):
+        for j in range(n):
+            if A[i,j] > thres:
+                A[i,j] = 0
+            else:
+                A[i,j] = 1
 
-# Test LDV:
+    zeroDeRn = np.zeros(n)
+    for i in range(n):
+        col = A.T[i]
+        if (col == zeroDeRn).all():
+            A[i,i] = 1
 
-L0 = np.array([[1,0,0],[1,1.,0],[1,1,1]])
-D0 = np.diag([1,2,3])
-V0 = np.array([[1,1,1],[0,1,1],[0,0,1]])
-A =  L0 @ D0  @ V0
-L,D,V,nops = calculaLDV(A)
-assert(np.allclose(L,L0))
-assert(np.allclose(D,D0))
-assert(np.allclose(V,V0))
+    listaNormalizados = normaliza(A.T,1)
+    res = np.array(listaNormalizados)
+    return res.T
+   
+#%% ej2
+def traspuesta(A):
+    n, m = A.shape
+    At = np.zeros((m,n))
+    for i in range(m):
+        for j in range(n):
+            At[i,j] = A[j,i]
+    
+    return At
 
-L0 = np.array([[1,0,0],[1,1.001,0],[1,1,1]])
-D0 = np.diag([3,2,1])
-V0 = np.array([[1,1,1],[0,1,1],[0,0,1.001]])
-A =  L0 @ D0  @ V0
-L,D,V,nops = calculaLDV(A)
-assert(np.allclose(L,L0,1e-3))
-assert(np.allclose(D,D0,1e-3))
-assert(np.allclose(V,V0,1e-3))
+def nucleo(A,tol=1e-15):
+    """
+    A una matriz de m x n
+    tol la tolerancia para asumir que un vector esta en el nucleo.
+    Calcula el nucleo de la matriz A diagonalizando la matriz traspuesta(A) * A (* la multiplicacion matricial), usando el medodo diagRH. El nucleo corresponde a los autovectores de autovalor con modulo <= tol.
+    Retorna los autovectores en cuestion, como una matriz de n x k, con k el numero de autovectores en el nucleo.
+    """
+    Ahermetiana = productoMatricial(A.T,A)
+    S, D = diagRH(Ahermetiana)
+    n = Ahermetiana.shape[0]
 
-# Tests SDP
+    primerIndiceNulo = n
+    i = 0
+    while i < n and D[i,i] >= tol:
+        i += 1
+    
+    primerIndiceNulo = i
+    autovectores = []
+    for i in range(primerIndiceNulo,n):
+        autovectores.append(S[:,i])
 
-L0 = np.array([[1,0,0],[1,1,0],[1,1,1]])
-D0 = np.diag([1,1,1])
-A = L0 @ D0 @ L0.T
-assert(esSDP(A))
+    return np.array(autovectores).T
 
-D0 = np.diag([1,-1,1])
-A = L0 @ D0 @ L0.T
-assert(not esSDP(A))
+def crea_rala(listado,m_filas,n_columnas,tol=1e-15):
+    """
+    Recibe una lista listado, con tres elementos: lista con indices i, lista con indices j, y lista con valores A_ij de la matriz A. Tambien las dimensiones de la matriz a traves de m_filas y n_columnas. Los elementos menores a tol se descartan.
+    Idealmente, el listado debe incluir unicamente posiciones correspondientes a valores distintos de cero. Retorna una lista con:
+    - Diccionario {(i,j):A_ij} que representa los elementos no nulos de la matriz A. Los elementos con modulo menor a tol deben descartarse por default. 
+    - Tupla (m_filas,n_columnas) que permita conocer las dimensiones de la matriz.
+    """
+    dict = {}
+    if len(listado) == 0:
+        return dict, (m_filas,n_columnas)
+    
 
-D0 = np.diag([1,1,1e-16])
-A = L0 @ D0 @ L0.T
-assert(not esSDP(A))
-
-L0 = np.array([[1,0,0],[1,1,0],[1,1,1]])
-D0 = np.diag([1,1,1])
-V0 = np.array([[1,0,0],[1,1,0],[1,1+1e-10,1]]).T
-A = L0 @ D0 @ V0
-assert(not esSDP(A))
-print("LABO4 OK!")
-
-#%% Tests L05-QR:
-
-
-# --- Matrices de prueba ---
-A2 = np.array([[1., 2.],
-               [3., 4.]])
-
-A3 = np.array([[1., 0., 1.],
-               [0., 1., 1.],
-               [1., 1., 0.]])
-
-A4 = np.array([[2., 0., 1., 3.],
-               [0., 1., 4., 1.],
-               [1., 0., 2., 0.],
-               [3., 1., 0., 2.]])
-
-# --- Funciones auxiliares para los tests ---
-def check_QR(Q,R,A,tol=1e-10):
-    # Comprueba ortogonalidad y reconstrucción
-    assert np.allclose(Q.T @ Q, np.eye(Q.shape[1]), atol=tol)
-    assert np.allclose(Q @ R, A, atol=tol)
-
-# --- TESTS PARA QR_by_GS2 ---
-Q2,R2 = QR_con_GS(A2)
-check_QR(Q2,R2,A2)
-
-Q3,R3 = QR_con_GS(A3)
-check_QR(Q3,R3,A3)
-
-Q4,R4 = QR_con_GS(A4)
-check_QR(Q4,R4,A4)
-
-# --- TESTS PARA QR_by_HH ---
-Q2h,R2h = QR_con_HH(A2)
-check_QR(Q2h,R2h,A2)
-
-Q3h,R3h = QR_con_HH(A3)
-check_QR(Q3h,R3h,A3)
-
-Q4h,R4h = QR_con_HH(A4)
-check_QR(Q4h,R4h,A4)
-
-# --- TESTS PARA calculaQR ---
-Q2c,R2c = calculaQR(A2,metodo='RH')
-check_QR(Q2c,R2c,A2)
-
-Q3c,R3c = calculaQR(A3,metodo='GS')
-check_QR(Q3c,R3c,A3)
-
-Q4c,R4c = calculaQR(A4,metodo='RH')
-check_QR(Q4c,R4c,A4)
-
-print("Labo5 OK!")
-# Test L06-metpot2k, Aval
-
-import numpy as np
-
-#### TESTEOS
-# Tests metpot2k
-
-S = np.vstack([
-    np.array([2,1,0])/np.sqrt(5),
-    np.array([-1,2,5])/np.sqrt(30),
-    np.array([1,-2,1])/np.sqrt(6)
-              ]).T
-
-# Pedimos que pase el 95% de los casos
-exitos = 0
-for i in range(100):
-    D = np.diag(np.random.random(3)+1)*100
-    A = S@D@S.T
-    v,l,_,_ = metpot2k(A,1e-15,1e5)
-    if np.abs(l - np.max(D))< 1e-8:
-        exitos += 1
-assert exitos > 95
+    filas = listado[0]
+    columnas = listado[1]
+    valores = listado[2]
+    for i in range(len(filas)):
+        if valores[i] >= tol:
+            dict[(filas[i],columnas[i])] = valores[i]
+    
+    return dict, (m_filas,n_columnas)
 
 
-#Test con HH
-exitos = 0
-for i in range(100):
-    v = np.random.rand(9)
-    #v = np.abs(v)
-    #v = (-1) * v
-    ixv = np.argsort(-np.abs(v))
-    D = np.diag(v[ixv])
-    I = np.eye(9)
-    H = I - 2*np.outer(v.T, v)/(np.linalg.norm(v)**2)   #matriz de HouseHolder
-
-    A = H@D@H.T
-    v,l,_,_ = metpot2k(A, 1e-15, 1e5)
-    #max_eigen = abs(D[0][0])
-    if abs(l - D[0,0]) < 1e-8:         
-        exitos +=1
-assert exitos > 95
-
-
-
-# Tests diagRH
-D = np.diag([1,0.5,0.25])
-S = np.vstack([
-    np.array([1,-1,1])/np.sqrt(3),
-    np.array([1,1,0])/np.sqrt(2),
-    np.array([1,-1,-2])/np.sqrt(6)
-              ]).T
-
-A = S@D@S.T
-SRH,DRH = diagRH(A,tol=1e-15,K=1e5)
-assert np.allclose(D,DRH)
-assert np.allclose(np.abs(S.T@SRH),np.eye(A.shape[0]),atol=1e-7)
-
-
-
-# Pedimos que pase el 95% de los casos
-exitos = 0
-for i in range(100):
-    A = np.random.random((5,5))
-    A = 0.5*(A+A.T)
-    S,D = diagRH(A,tol=1e-15,K=1e5)
-    ARH = S@D@S.T
-    e = normaExacta(ARH-A,p='inf')
-    if e < 1e-5: 
-        exitos += 1
-assert exitos >= 95
-
-print("LABO 6 OK!")
-
-# %%
+def multiplica_rala_vector(A,v):
+    """
+    Recibe una matriz rala creada con crea_rala y un vector v. 
+    Retorna un vector w resultado de multiplicar A con v
+    """
+    dict, dims = A
+    res = np.zeros(dims[0])
+    values = []
+    for i in range(dims[0]):
+        sum = 0
+        for j in range(v.size):
+            if (i,j) in dict:
+                valor_posible = dict[(i,j)]*v[j]
+                sum += valor_posible
+        values.append(sum)
+    
+    return np.array(values)
