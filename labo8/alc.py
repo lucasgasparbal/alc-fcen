@@ -68,14 +68,17 @@ def norma(x,p):
 
     sum = np.float64(0)
     for elem in x:
-        sum += abs(elem**p)
+        val = elem**p
+        sum += abs(val)
         
     return sum ** (1/p)
 
 def normaliza(X,p):
     res = []
     for x in X:
-        res.append(x/norma(x,p))
+        nor = norma(x,p)
+        if nor != 0:
+            res.append(x/nor)
     
         
     return res
@@ -239,10 +242,9 @@ def productoEscalar(x,y,atol=1e-12):
     
     suma = np.float64(0)
     for i in range(n):
-        termino = x[i]*y[i]
-        if abs(termino) >= atol:
+        if abs(x[i]) >= atol and abs(y[i]) >= atol:
             suma += x[i]*y[i]
-
+    
     return suma
 
 def vTA(v,A,atol=1e-12):
@@ -268,7 +270,13 @@ def Ax(A,x,atol=1e-12):
 
     return b
 
-def check_tol(A,tol=1e-12):
+def check_tol_vector(v,tol=1e-15):
+    n = v.size
+    for i in range(n):
+        if v[i] < tol:
+            v[i] = 0
+
+def check_tol(A,tol=1e-15):
     n, m = A.shape
     for i in range(n):
         for j in range(m):
@@ -470,8 +478,13 @@ def metpot(A,tol=1e-15,K=1000):
 def diagRH(A,tol=1e-15,K=1e5):
     v1, l1,_ = metpot(A,tol,K)
     n = A.shape[0]
-    u = np.eye(n,dtype=np.float64)[0]-v1
-    u = u/norma(u,2)
+    e1 = np.eye(n)[0]
+    u = e1-v1
+    nor = norma(u,2)
+    if nor < tol:
+        u = e1
+    else:
+        u = u/norma(u,2)
     if n == 2:
         S = np.eye(n)-2*uuT(u,tol)
         check_tol(S)
@@ -496,13 +509,31 @@ def diagRH(A,tol=1e-15,K=1e5):
 
     return S, D
 
-def diagRHSVDReducida(A,tol=1e-15,K=1e5):
+
+def diagRHSVD(A,tol=1e-15,K=1e5,cant_autovals = 'max'):
+    if cant_autovals == 'max':
+        S, D = _diagRHSVDMax(A,tol,K)
+    else:
+        S, D = _diagRHSVD(A,cant_autovals,tol,K,)
+    n = D.shape[0]
+    i = 0
+    while i < n and abs(D[i,i]) >= tol:
+        i += 1
+    
+    return S[:,:i], D[:i,:i] #tengo que recortar las columnas de S porque uso la traspuesta
+
+
+def _diagRHSVDMax(A,tol=1e-15,K=1e5):
     v1, l1,_ = metpot(A,tol,K)
     if l1 < tol:
         return np.zeros(A.shape), np.zeros(A.shape)
     n = A.shape[0]
     u = np.eye(n,dtype=np.float64)[0]-v1
-    u = u/norma(u,2)
+    normaU = norma(u,2)
+    if normaU < tol:
+        u = v1 #v1 es e1
+    else:
+        u = u/normaU
     if n == 2:
         S = np.eye(n)-2*uuT(u,tol)
         check_tol(S)
@@ -515,7 +546,42 @@ def diagRHSVDReducida(A,tol=1e-15,K=1e5):
         B= B-2*vwT(productoMatricial(B,u,tol),u,tol)
         check_tol(B)
         Amonio = B[1:n,1:n]
-        Smonio, Dmonio = diagRH(Amonio,tol,K)
+        Smonio, Dmonio = _diagRHSVDMax(Amonio,tol,K)
+        D = np.zeros((n,n),dtype=np.float64)
+        D[0,0] = l1
+        D[1:n,1:n] = Dmonio
+        S = np.zeros((n,n),dtype=np.float64)
+        S[0,0] = 1
+        S[1:n,1:n] = Smonio
+        S = S-2*vwT(u,productoMatricial(u,S,tol),tol)
+        check_tol(S)
+
+    return S, D
+
+def _diagRHSVD(A,cant_autovals,tol=1e-15,K=1e5):
+    v1, l1,_ = metpot(A,tol,K)
+    if l1 < tol or cant_autovals == 0:
+        return np.zeros(A.shape), np.zeros(A.shape)
+    n = A.shape[0]
+    u = np.eye(n,dtype=np.float64)[0]-v1
+    normaU = norma(u,2)
+    if normaU < tol:
+        u = v1 #v1 es e1
+    else:
+        u = u/normaU
+    if n == 2:
+        S = np.eye(n)-2*uuT(u,tol)
+        check_tol(S)
+        D = A-2*vwT(u,productoMatricial(u,A,tol),tol)
+        D = D-2*vwT(productoMatricial(D,u,tol),u,tol)
+        check_tol(D)
+    else:
+        B = A-2*vwT(u,productoMatricial(u,A,tol),tol)
+        check_tol(B)
+        B= B-2*vwT(productoMatricial(B,u,tol),u,tol)
+        check_tol(B)
+        Amonio = B[1:n,1:n]
+        Smonio, Dmonio = _diagRHSVD(Amonio,cant_autovals-1,tol,K)
         D = np.zeros((n,n),dtype=np.float64)
         D[0,0] = l1
         D[1:n,1:n] = Dmonio
@@ -566,21 +632,58 @@ def transiciones_al_azar_uniformes(n,thres):
     return res.T
 
 #Labo 8
-def obtener_VrUS(A, tol):
-    V, S = diagRH(A.T@A)
-    S = np.sqrt(np.diagonal(S))
-    r = np.sum(abs(S) > tol)
-    U = np.array(normaliza((A@V).T,2)).T
-    return V, r, U, S
 
-def svd_reducida(A,k='max',tol=1e-15):
-    if A.shape[0]<A.shape[1]:
-        U, r, V, S = obtener_VrUS(A.T, tol)
+def diagonal(A):
+    m, n = A.shape
+    if m != n:
+        return None
+    res = []
+    for i in range(n):
+        res.append(A[i,i])
+    
+    return np.array(res)
+# Tests L08
+def svd_reducida(A,k="max",tol=1e-15):
+    """
+    A la matriz de interes (de m x n)
+    k el numero de valores singulares (y vectores) a retener.
+    tol la tolerancia para considerar un valor singular igual a cero
+    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
+    """
+    m,n = A.shape
+    
+    if n >= m: #mas columnas que filas, se resuelve para A
+        Asim = productoMatricial(A.T,A,tol)
+    else: #mas filas que columnas, se resuelve para A.T
+        Asim = productoMatricial(A,A.T,tol)
+
+    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
+    B = productoMatricial(A,V,tol)
+
+    columnasU = normaliza(B.T,2)
+    U = np.array(columnasU).T
+
+    sig = np.sqrt(diagonal(D))
+
+    if n < m:
+        return V, sig, U
     else:
-        V, r, U, S = obtener_VrUS(A, tol)
-    if k == 'max':
-        return U,S,V
-    return U[:,:k], S[:k], V[:k,:]
+        return U, sig, V
+# def obtener_VrUS(A, tol):
+#     V, S = diagRH(A.T@A)
+#     S = np.sqrt(np.diagonal(S))
+#     r = np.sum(abs(S) > tol)
+#     U = np.array(normaliza((A@V).T,2)).T
+#     return V, r, U, S
+
+# def svd_reducida(A,k='max',tol=1e-15):
+#     if A.shape[0]<A.shape[1]:
+#         U, r, V, S = obtener_VrUS(A.T, tol)
+#     else:
+#         V, r, U, S = obtener_VrUS(A, tol)
+#     if k == 'max':
+#         return U,S,V
+#     return U[:,:k], S[:k], V[:k,:]
    
 #%% ej2
 def traspuesta(A):

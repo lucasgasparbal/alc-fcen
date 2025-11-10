@@ -331,7 +331,7 @@ def test_labo6():
         
     print("FALLOS DIAGRH :" + str(fallos))
 
-    assert np.allclose(D,DRH)
+    assert np.allclose(D,DRH), "Fallo la tolerancia pegate un tiro"
     assert np.allclose(np.abs(S.T@SRH),np.eye(A.shape[0]),atol=1e-7)
 
 
