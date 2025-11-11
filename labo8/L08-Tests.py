@@ -19,7 +19,7 @@ def svd_reducida(A,k="max",tol=1e-15):
     """
     m,n = A.shape
     
-    if n >= m: #mas columnas que filas, se resuelve para A.T
+    if n > m: #mas columnas que filas, se resuelve para A.T
         Asim = productoMatricial(A,A.T,tol)
         A = A.T
     else: #mas filas que columnas, se resuelve para A
@@ -33,7 +33,7 @@ def svd_reducida(A,k="max",tol=1e-15):
 
     sig = np.sqrt(diagonal(D))
 
-    if n >= m:
+    if n > m:
         return V, sig, U
     else:
         return U, sig, V
@@ -85,9 +85,9 @@ for tam_nucleo in [2,4,6]:
 A = np.random.random((8,6))
 for k in [1,3,5]:
     hU,hS,hV = svd_reducida(A,k=k)
-    assert hU.shape[0] == A.shape[0], 'Dimensiones de hU incorrectas (caso a)'
-    assert hV.shape[0] == A.shape[1], 'Dimensiones de hV incorrectas(caso a)'
-    assert hU.shape[1] == k, 'Dimensiones de hU incorrectas (caso a)'
-    assert hV.shape[1] == k, 'Dimensiones de hV incorrectas(caso a)'
+    assert hU.shape[0] == A.shape[0], 'Dimensiones de hU incorrectas (caso k='+str(k)+')'
+    assert hV.shape[0] == A.shape[1], 'Dimensiones de hV incorrectas(caso k='+str(k)+')'
+    assert hU.shape[1] == k, 'Dimensiones de hU incorrectas (caso k='+str(k)+')'
+    assert hV.shape[1] == k, 'Dimensiones de hV incorrectas(caso k='+str(k)+')'
     assert len(hS) == k, 'Tamaño de hS incorrecto'
 print("BIEN DIMENSIONES")

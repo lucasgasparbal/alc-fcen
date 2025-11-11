@@ -514,7 +514,7 @@ def diagRHSVD(A,tol=1e-15,K=1e5,cant_autovals = 'max'):
     if cant_autovals == 'max':
         S, D = _diagRHSVDMax(A,tol,K)
     else:
-        S, D = _diagRHSVD(A,cant_autovals,tol,K,)
+        S, D = _diagRHSVD(A,cant_autovals,tol,K)
     n = D.shape[0]
     i = 0
     while i < n and abs(D[i,i]) >= tol:
@@ -574,6 +574,8 @@ def _diagRHSVD(A,cant_autovals,tol=1e-15,K=1e5):
         check_tol(S)
         D = A-2*vwT(u,productoMatricial(u,A,tol),tol)
         D = D-2*vwT(productoMatricial(D,u,tol),u,tol)
+        if cant_autovals == 1:
+            D[1,1] = 0
         check_tol(D)
     else:
         B = A-2*vwT(u,productoMatricial(u,A,tol),tol)
@@ -642,50 +644,7 @@ def diagonal(A):
         res.append(A[i,i])
     
     return np.array(res)
-# Tests L08
-def svd_reducida(A,k="max",tol=1e-15):
-    """
-    A la matriz de interes (de m x n)
-    k el numero de valores singulares (y vectores) a retener.
-    tol la tolerancia para considerar un valor singular igual a cero
-    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
-    """
-    m,n = A.shape
-    
-    if n >= m: #mas columnas que filas, se resuelve para A
-        Asim = productoMatricial(A.T,A,tol)
-    else: #mas filas que columnas, se resuelve para A.T
-        Asim = productoMatricial(A,A.T,tol)
 
-    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
-    B = productoMatricial(A,V,tol)
-
-    columnasU = normaliza(B.T,2)
-    U = np.array(columnasU).T
-
-    sig = np.sqrt(diagonal(D))
-
-    if n < m:
-        return V, sig, U
-    else:
-        return U, sig, V
-# def obtener_VrUS(A, tol):
-#     V, S = diagRH(A.T@A)
-#     S = np.sqrt(np.diagonal(S))
-#     r = np.sum(abs(S) > tol)
-#     U = np.array(normaliza((A@V).T,2)).T
-#     return V, r, U, S
-
-# def svd_reducida(A,k='max',tol=1e-15):
-#     if A.shape[0]<A.shape[1]:
-#         U, r, V, S = obtener_VrUS(A.T, tol)
-#     else:
-#         V, r, U, S = obtener_VrUS(A, tol)
-#     if k == 'max':
-#         return U,S,V
-#     return U[:,:k], S[:k], V[:k,:]
-   
-#%% ej2
 def traspuesta(A):
     n, m = A.shape
     At = np.zeros((m,n))
@@ -756,3 +715,69 @@ def multiplica_rala_vector(A,v):
         values.append(sum)
     
     return np.array(values)
+
+# Tests L08
+def svd_reducida1(A,k="max",tol=1e-15):
+    """
+    A la matriz de interes (de m x n)
+    k el numero de valores singulares (y vectores) a retener.
+    tol la tolerancia para considerar un valor singular igual a cero
+    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
+    """
+    m,n = A.shape
+    
+    if n >= m: #mas columnas que filas, se resuelve para A
+        Asim = productoMatricial(A.T,A,tol)
+    else: #mas filas que columnas, se resuelve para A.T
+        Asim = productoMatricial(A,A.T,tol)
+
+    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
+    B = productoMatricial(A,V,tol)
+
+    columnasU = normaliza(B.T,2)
+    U = np.array(columnasU).T
+
+    sig = np.sqrt(diagonal(D))
+
+    if n < m:
+        return V, sig, U
+    else:
+        return U, sig, V
+    
+def diagonal(A):
+    m, n = A.shape
+    if m != n:
+        return None
+    res = []
+    for i in range(n):
+        res.append(A[i,i])
+    
+    return np.array(res)
+# Tests L08
+def svd_reducida(A,k="max",tol=1e-15):
+    """
+    A la matriz de interes (de m x n)
+    k el numero de valores singulares (y vectores) a retener.
+    tol la tolerancia para considerar un valor singular igual a cero
+    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
+    """
+    m,n = A.shape
+    
+    if n > m: #mas columnas que filas, se resuelve para A.T
+        Asim = productoMatricial(A,A.T,tol)
+        A = A.T
+    else: #mas filas que columnas, se resuelve para A
+        Asim = productoMatricial(A.T,A,tol)
+
+    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
+    B = productoMatricial(A,V,tol)
+
+    columnasU = normaliza(B.T,2)
+    U = np.array(columnasU).T
+
+    sig = np.sqrt(diagonal(D))
+
+    if n > m:
+        return V.T, sig, U
+    else:
+        return U, sig, V
