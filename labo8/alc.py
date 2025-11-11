@@ -510,6 +510,158 @@ def diagRH(A,tol=1e-15,K=1e5):
     return S, D
 
 
+#LABO 7
+       
+def transiciones_al_azar_continuas(n):
+    """
+    n la cantidad de filas (columnas) de la matriz de transición.
+    Retorna matriz T de n x n normalizada por columnas, y con entradas al azar en el intervalo [0,1]
+    """
+    A = np.random.rand(n,n)
+    listaNormalizados = normaliza(A.T,1)
+    res = np.array(listaNormalizados)
+    return res.T
+
+def transiciones_al_azar_uniformes(n,thres):
+    """
+    n la cantidad de filas (columnas) de la matriz de transición.
+    thres probabilidad de que una entrada sea distinta de cero.
+    Retorna matriz T de n x n normalizada por columnas. 
+    El elemento i,j es distinto de cero si el número generado al azar para i,j es menor o igual a thres. 
+    Todos los elementos de la columna $j$ son iguales 
+    (a 1 sobre el número de elementos distintos de cero en la columna).
+    """
+    
+    A = np.random.rand(n,n)
+    for i in range(n):
+        for j in range(n):
+            if A[i,j] > thres:
+                A[i,j] = 0
+            else:
+                A[i,j] = 1
+
+    zeroDeRn = np.zeros(n)
+    for i in range(n):
+        col = A.T[i]
+        if (col == zeroDeRn).all():
+            A[i,i] = 1
+
+    listaNormalizados = normaliza(A.T,1)
+    res = np.array(listaNormalizados)
+    return res.T
+
+def traspuesta(A):
+    n, m = A.shape
+    At = np.zeros((m,n))
+    for i in range(m):
+        for j in range(n):
+            At[i,j] = A[j,i]
+    
+    return At
+
+def nucleo(A,tol=1e-15):
+    """
+    A una matriz de m x n
+    tol la tolerancia para asumir que un vector esta en el nucleo.
+    Calcula el nucleo de la matriz A diagonalizando la matriz traspuesta(A) * A (* la multiplicacion matricial), usando el medodo diagRH. El nucleo corresponde a los autovectores de autovalor con modulo <= tol.
+    Retorna los autovectores en cuestion, como una matriz de n x k, con k el numero de autovectores en el nucleo.
+    """
+    Ahermetiana = productoMatricial(A.T,A)
+    S, D = diagRH(Ahermetiana)
+    n = Ahermetiana.shape[0]
+
+    primerIndiceNulo = n
+    i = 0
+    while i < n and D[i,i] >= tol:
+        i += 1
+    
+    primerIndiceNulo = i
+    autovectores = []
+    for i in range(primerIndiceNulo,n):
+        autovectores.append(S[:,i])
+
+    return np.array(autovectores).T
+
+def crea_rala(listado,m_filas,n_columnas,tol=1e-15):
+    """
+    Recibe una lista listado, con tres elementos: lista con indices i, lista con indices j, y lista con valores A_ij de la matriz A. Tambien las dimensiones de la matriz a traves de m_filas y n_columnas. Los elementos menores a tol se descartan.
+    Idealmente, el listado debe incluir unicamente posiciones correspondientes a valores distintos de cero. Retorna una lista con:
+    - Diccionario {(i,j):A_ij} que representa los elementos no nulos de la matriz A. Los elementos con modulo menor a tol deben descartarse por default. 
+    - Tupla (m_filas,n_columnas) que permita conocer las dimensiones de la matriz.
+    """
+    dict = {}
+    if len(listado) == 0:
+        return dict, (m_filas,n_columnas)
+    
+
+    filas = listado[0]
+    columnas = listado[1]
+    valores = listado[2]
+    for i in range(len(filas)):
+        if valores[i] >= tol:
+            dict[(filas[i],columnas[i])] = valores[i]
+    
+    return dict, (m_filas,n_columnas)
+
+def multiplica_rala_vector(A,v):
+    """
+    Recibe una matriz rala creada con crea_rala y un vector v. 
+    Retorna un vector w resultado de multiplicar A con v
+    """
+    dict, dims = A
+    res = np.zeros(dims[0])
+    values = []
+    for i in range(dims[0]):
+        sum = 0
+        for j in range(v.size):
+            if (i,j) in dict:
+                valor_posible = dict[(i,j)]*v[j]
+                sum += valor_posible
+        values.append(sum)
+    
+    return np.array(values)
+
+#LABO 8
+def diagonal(A):
+    m, n = A.shape
+    if m != n:
+        return None
+    res = []
+    for i in range(n):
+        res.append(A[i,i])
+    
+    return np.array(res)
+
+
+def svd_reducida(A,k="max",tol=1e-15):
+    """
+    A la matriz de interes (de m x n)
+    k el numero de valores singulares (y vectores) a retener.
+    tol la tolerancia para considerar un valor singular igual a cero
+    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
+    """
+    m,n = A.shape
+    
+    if n > m: #mas columnas que filas, se resuelve para A.T
+        Asim = productoMatricial(A,A.T,tol)
+        A = A.T
+    else: #mas filas que columnas, se resuelve para A
+        Asim = productoMatricial(A.T,A,tol)
+
+    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
+    B = productoMatricial(A,V,tol)
+
+    columnasU = normaliza(B.T,2)
+    U = np.array(columnasU).T
+
+    sig = np.sqrt(diagonal(D))
+
+    if n > m:
+        return V, sig, U
+    else:
+        return U, sig, V
+    
+
 def diagRHSVD(A,tol=1e-15,K=1e5,cant_autovals = 'max'):
     if cant_autovals == 'max':
         S, D = _diagRHSVDMax(A,tol,K)
@@ -594,190 +746,3 @@ def _diagRHSVD(A,cant_autovals,tol=1e-15,K=1e5):
         check_tol(S)
 
     return S, D
-       
-def transiciones_al_azar_continuas(n):
-    """
-    n la cantidad de filas (columnas) de la matriz de transición.
-    Retorna matriz T de n x n normalizada por columnas, y con entradas al azar en el intervalo [0,1]
-    """
-    A = np.random.rand(n,n)
-    listaNormalizados = normaliza(A.T,1)
-    res = np.array(listaNormalizados)
-    return res.T
-
-def transiciones_al_azar_uniformes(n,thres):
-    """
-    n la cantidad de filas (columnas) de la matriz de transición.
-    thres probabilidad de que una entrada sea distinta de cero.
-    Retorna matriz T de n x n normalizada por columnas. 
-    El elemento i,j es distinto de cero si el número generado al azar para i,j es menor o igual a thres. 
-    Todos los elementos de la columna $j$ son iguales 
-    (a 1 sobre el número de elementos distintos de cero en la columna).
-    """
-    
-    A = np.random.rand(n,n)
-    for i in range(n):
-        for j in range(n):
-            if A[i,j] > thres:
-                A[i,j] = 0
-            else:
-                A[i,j] = 1
-
-    zeroDeRn = np.zeros(n)
-    for i in range(n):
-        col = A.T[i]
-        if (col == zeroDeRn).all():
-            A[i,i] = 1
-
-    listaNormalizados = normaliza(A.T,1)
-    res = np.array(listaNormalizados)
-    return res.T
-
-#Labo 8
-
-def diagonal(A):
-    m, n = A.shape
-    if m != n:
-        return None
-    res = []
-    for i in range(n):
-        res.append(A[i,i])
-    
-    return np.array(res)
-
-def traspuesta(A):
-    n, m = A.shape
-    At = np.zeros((m,n))
-    for i in range(m):
-        for j in range(n):
-            At[i,j] = A[j,i]
-    
-    return At
-
-def nucleo(A,tol=1e-15):
-    """
-    A una matriz de m x n
-    tol la tolerancia para asumir que un vector esta en el nucleo.
-    Calcula el nucleo de la matriz A diagonalizando la matriz traspuesta(A) * A (* la multiplicacion matricial), usando el medodo diagRH. El nucleo corresponde a los autovectores de autovalor con modulo <= tol.
-    Retorna los autovectores en cuestion, como una matriz de n x k, con k el numero de autovectores en el nucleo.
-    """
-    Ahermetiana = productoMatricial(A.T,A)
-    S, D = diagRH(Ahermetiana)
-    n = Ahermetiana.shape[0]
-
-    primerIndiceNulo = n
-    i = 0
-    while i < n and D[i,i] >= tol:
-        i += 1
-    
-    primerIndiceNulo = i
-    autovectores = []
-    for i in range(primerIndiceNulo,n):
-        autovectores.append(S[:,i])
-
-    return np.array(autovectores).T
-
-def crea_rala(listado,m_filas,n_columnas,tol=1e-15):
-    """
-    Recibe una lista listado, con tres elementos: lista con indices i, lista con indices j, y lista con valores A_ij de la matriz A. Tambien las dimensiones de la matriz a traves de m_filas y n_columnas. Los elementos menores a tol se descartan.
-    Idealmente, el listado debe incluir unicamente posiciones correspondientes a valores distintos de cero. Retorna una lista con:
-    - Diccionario {(i,j):A_ij} que representa los elementos no nulos de la matriz A. Los elementos con modulo menor a tol deben descartarse por default. 
-    - Tupla (m_filas,n_columnas) que permita conocer las dimensiones de la matriz.
-    """
-    dict = {}
-    if len(listado) == 0:
-        return dict, (m_filas,n_columnas)
-    
-
-    filas = listado[0]
-    columnas = listado[1]
-    valores = listado[2]
-    for i in range(len(filas)):
-        if valores[i] >= tol:
-            dict[(filas[i],columnas[i])] = valores[i]
-    
-    return dict, (m_filas,n_columnas)
-
-def multiplica_rala_vector(A,v):
-    """
-    Recibe una matriz rala creada con crea_rala y un vector v. 
-    Retorna un vector w resultado de multiplicar A con v
-    """
-    dict, dims = A
-    res = np.zeros(dims[0])
-    values = []
-    for i in range(dims[0]):
-        sum = 0
-        for j in range(v.size):
-            if (i,j) in dict:
-                valor_posible = dict[(i,j)]*v[j]
-                sum += valor_posible
-        values.append(sum)
-    
-    return np.array(values)
-
-# Tests L08
-def svd_reducida1(A,k="max",tol=1e-15):
-    """
-    A la matriz de interes (de m x n)
-    k el numero de valores singulares (y vectores) a retener.
-    tol la tolerancia para considerar un valor singular igual a cero
-    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
-    """
-    m,n = A.shape
-    
-    if n >= m: #mas columnas que filas, se resuelve para A
-        Asim = productoMatricial(A.T,A,tol)
-    else: #mas filas que columnas, se resuelve para A.T
-        Asim = productoMatricial(A,A.T,tol)
-
-    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
-    B = productoMatricial(A,V,tol)
-
-    columnasU = normaliza(B.T,2)
-    U = np.array(columnasU).T
-
-    sig = np.sqrt(diagonal(D))
-
-    if n < m:
-        return V, sig, U
-    else:
-        return U, sig, V
-    
-def diagonal(A):
-    m, n = A.shape
-    if m != n:
-        return None
-    res = []
-    for i in range(n):
-        res.append(A[i,i])
-    
-    return np.array(res)
-# Tests L08
-def svd_reducida(A,k="max",tol=1e-15):
-    """
-    A la matriz de interes (de m x n)
-    k el numero de valores singulares (y vectores) a retener.
-    tol la tolerancia para considerar un valor singular igual a cero
-    Retorna hatU (matriz de m x k), hatSig (vector de k valores singulares) y hatV (matriz de n x k)
-    """
-    m,n = A.shape
-    
-    if n > m: #mas columnas que filas, se resuelve para A.T
-        Asim = productoMatricial(A,A.T,tol)
-        A = A.T
-    else: #mas filas que columnas, se resuelve para A
-        Asim = productoMatricial(A.T,A,tol)
-
-    V, D = diagRHSVD(Asim,tol,cant_autovals = k)
-    B = productoMatricial(A,V,tol)
-
-    columnasU = normaliza(B.T,2)
-    U = np.array(columnasU).T
-
-    sig = np.sqrt(diagonal(D))
-
-    if n > m:
-        return V.T, sig, U
-    else:
-        return U, sig, V
